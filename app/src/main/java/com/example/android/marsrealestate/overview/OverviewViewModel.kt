@@ -26,21 +26,27 @@ import com.example.android.marsrealestate.network.MarsProperty
 import com.example.android.marsrealestate.network.getResult
 import kotlinx.coroutines.launch
 
+enum class MarsApiStatus { LOADING, ERROR, DONE }
 /**
  * The [ViewModel] that is attached to the [OverviewFragment].
  */
 class OverviewViewModel : ViewModel() {
 
     // The internal MutableLiveData String that stores the status of the most recent request
-    private val _status = MutableLiveData<String>()
+    private val _status = MutableLiveData<MarsApiStatus>()
 
     // The external immutable LiveData for the request status String
-    val status: LiveData<String>
+    val status: LiveData<MarsApiStatus>
         get() = _status
 
-    private val _property = MutableLiveData<MarsProperty>()
-    val property: LiveData<MarsProperty>
-        get() = _property
+    private val _properties = MutableLiveData<List<MarsProperty>>()
+
+    val properties: LiveData<List<MarsProperty>>
+        get() = _properties
+
+    private val _navigateToSelectedProperty = MutableLiveData<MarsProperty>()
+    val navigateToSelectedProperty: LiveData<MarsProperty>
+        get() = _navigateToSelectedProperty
 
     /**
      * Call getMarsRealEstateProperties() on init so we can display status immediately.
@@ -49,17 +55,30 @@ class OverviewViewModel : ViewModel() {
         getMarsRealEstateProperties()
     }
 
+    fun displayPropertyDetails(marsProperty: MarsProperty) {
+        _navigateToSelectedProperty.value = marsProperty
+    }
+
+    fun displayPropertyDetailsComplete() {
+        _navigateToSelectedProperty.value = null
+    }
+
     /**
      * Sets the value of the status LiveData to the Mars API status.
      */
     private fun getMarsRealEstateProperties() {
         viewModelScope.launch {
+            _status.value = MarsApiStatus.LOADING
             MarsApi.retrofitService.getPropertiesAsync().getResult()
                     .fold(
-                            { result ->
-                                if (result.isNotEmpty()) _property.value = result[0]
+                            onSuccess = { result ->
+                                _status.value = MarsApiStatus.DONE
+                                _properties.value = result
                             },
-                            { error -> _status.value = "Error: ${error.message}" }
+                            onFailure = {
+                                _status.value = MarsApiStatus.ERROR
+                                _properties.value = emptyList()
+                            }
                     )
         }
     }
